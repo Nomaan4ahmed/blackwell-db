@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blackwell DB Browser Demo</title>
+    <style>
+      body {
+        color: #151515;
+        font-family: Arial, sans-serif;
+        margin: 32px;
+      }
+
+      button {
+        cursor: pointer;
+        margin-right: 8px;
+        padding: 8px 12px;
+      }
+
+      pre {
+        background: #f3f5f7;
+        border: 1px solid #d7dce2;
+        padding: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Blackwell DB Browser Demo</h1>
+    <button id="add">Add Local Record</button>
+    <button id="query">Query Indexed Records</button>
+    <pre id="output"></pre>
+
+    <script type="module">
+      import { IndexedDBAdapter, openBlackwellDB } from "../src/browser.js";
+
+      const output = document.querySelector("#output");
+      const db = await openBlackwellDB({
+        adapter: new IndexedDBAdapter({ name: "blackwell-browser-demo" })
+      });
+
+      await db.ensureCollection("notes", { indexes: ["kind", "createdAt"] });
+      const notes = db.collection("notes");
+
+      document.querySelector("#add").addEventListener("click", async () => {
+        await notes.put({
+          kind: "local",
+          body: `Saved on this computer at ${new Date().toLocaleTimeString()}`,
+          createdAt: Date.now()
+        });
+        output.textContent = "Saved locally in IndexedDB. No backend server was contacted.";
+      });
+
+      document.querySelector("#query").addEventListener("click", async () => {
+        const rows = await notes.find({
+          where: { kind: "local" },
+          sort: { field: "createdAt", dir: "desc" },
+          limit: 10
+        });
+        output.textContent = JSON.stringify(rows, null, 2);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+examples/*.bwl
+examples/*.tmp
+work/
+.git/
+.github/

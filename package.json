@@ -1,0 +1,43 @@
+{
+  "name": "blackwell-db",
+  "version": "0.1.0",
+  "description": "Embedded local-first JavaScript database that runs on the user's computer with no backend server.",
+  "type": "module",
+  "main": "./src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cerevontho/blackwell-db.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cerevontho/blackwell-db/issues"
+  },
+  "homepage": "https://github.com/cerevontho/blackwell-db#readme",
+  "exports": {
+    ".": "./src/index.js",
+    "./node": "./src/node.js",
+    "./browser": "./src/browser.js",
+    "./crypto": "./src/crypto.js",
+    "./secure": "./src/secure-collection.js",
+    "./adapters/memory": "./src/adapters/memory-adapter.js",
+    "./adapters/file": "./src/adapters/file-adapter.js",
+    "./adapters/indexeddb": "./src/adapters/indexeddb-adapter.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "example:node": "node examples/local-node-app.js",
+    "example:secure": "node examples/secure-node-app.js",
+    "bench": "node examples/benchmark.js"
+  },
+  "keywords": [
+    "embedded",
+    "local-first",
+    "database",
+    "offline",
+    "indexeddb",
+    "wal"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}
