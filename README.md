@@ -72,6 +72,7 @@ await db.collection("notes").put({
 - JSON export/import for backup or peer sync layers.
 - Optional AES-GCM secure collections for encrypted private user payloads.
 - Pluggable AI backend hub with per-backend input limits, timeout guards, and context sanitization.
+- Optional 5FA enforcement for private payload access in secure collections.
 - Company/admin control views for suspend, unsuspend, lock, unlock, flag, notes, deletion hold, and restore actions without exposing private payloads.
 
 ## Commands
@@ -131,6 +132,14 @@ const privateView = await users.getPrivate("user-1");
 ```
 
 The company view advertises `companyAccessPercent: 7.5` and `companyAccessScope: "operations-only"`. It never includes `private`, `encryptedPrivate`, or plaintext private fields. The private payload can only be decrypted by code holding the encryption key.
+
+Secure collections can also enforce 5-factor verification before private payload reads:
+
+- Enable `fiveFA.enabled: true` with a custom async `fiveFA.verifier`.
+- Exactly 5 unique factors are required.
+- `beginFiveFA(id)` starts a challenge window.
+- `verifyFiveFAFactor(id, factor, proof)` marks each verified factor.
+- `getPrivate(id)` is blocked until all 5 factors are verified.
 
 ## AI Backends
 

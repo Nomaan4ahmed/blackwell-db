@@ -231,3 +231,52 @@ test("enforces HTTPS for HTTP AI backend by default", async () => {
     /must use https/
   );
 });
+
+test("enforces 5FA before private payload access when enabled", async () => {
+  const key = await generateBlackwellSecret();
+  const db = await openBlackwellDB({ adapter: new MemoryAdapter() });
+  const users = await openSecureCollection(db, "fivefa-users", {
+    encryptionKey: key,
+    fiveFA: {
+      enabled: true,
+      verifier: async ({ factor, proof }) => proof === `ok-${factor}`
+    }
+  });
+
+  await users.put("user-5fa", { email: "fivefa@example.com" }, { ownerId: "user-5fa" });
+
+  await assert.rejects(() => users.getPrivate("user-5fa"), /5FA verification required/);
+
+  const started = users.beginFiveFA("user-5fa");
+  assert.equal(started.required.length, 5);
+
+  for (const factor of started.required.slice(0, 4)) {
+    await users.verifyFiveFAFactor("user-5fa", factor, `ok-${factor}`);
+  }
+
+  await assert.rejects(() => users.getPrivate("user-5fa"), /5FA verification required/);
+
+  const lastFactor = started.required[4];
+  await users.verifyFiveFAFactor("user-5fa", lastFactor, `ok-${lastFactor}`);
+  const privateView = await users.getPrivate("user-5fa");
+  assert.equal(privateView.private.email, "fivefa@example.com");
+  await assert.rejects(() => users.getPrivate("user-5fa"), /5FA verification required/);
+});
+
+test("5FA configuration requires exactly five unique factors", async () => {
+  const key = await generateBlackwellSecret();
+  const db = await openBlackwellDB({ adapter: new MemoryAdapter() });
+
+  await assert.rejects(
+    () =>
+      openSecureCollection(db, "invalid-fivefa", {
+        encryptionKey: key,
+        fiveFA: {
+          enabled: true,
+          factors: ["one", "two", "three", "four"],
+          verifier: async () => true
+        }
+      }),
+    /exactly 5 unique factors/
+  );
+});

@@ -77,6 +77,8 @@ The company view is intentionally limited to operational metadata and reports `c
 
 Important boundary: encryption protects stored data from casual inspection and from company-control code that does not hold the key. Any process that has the encryption key can decrypt the private payload, so apps should store and release that key carefully.
 
+Secure collections also support optional 5FA gates for private payload reads. When enabled, apps must verify exactly five configured factors inside a short challenge window before `getPrivate()` succeeds.
+
 ## Truthful Boundary
 
 Blackwell DB can make the backend unnecessary for local reads and writes. Multi-device internet sync cannot be 100 percent magic without some path for peers to find each other. That path can be a local network, removable file, WebRTC rendezvous, or a tiny relay. The database itself remains serverless; sync is an optional layer above it.

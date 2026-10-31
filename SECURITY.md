@@ -9,6 +9,7 @@ Open a private security advisory on GitHub if available, or contact the reposito
 ## Security Boundary
 
 - Secure collections encrypt private payloads with AES-GCM.
+- Optional 5FA checks can be required before private payload reads.
 - Company/admin views expose operational metadata only.
 - Any process holding the encryption key can decrypt private data.
 - Key storage, key recovery, and sync trust models belong to the application using Blackwell DB.

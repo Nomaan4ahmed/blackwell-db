@@ -5,6 +5,7 @@ export const COMPANY_ACCESS_PERCENT = 7.5;
 
 const SECURE_VERSION = 1;
 const DEFAULT_STATE = "active";
+const DEFAULT_FIVE_FA_FACTORS = ["knowledge", "possession", "biometric", "location", "behavior"];
 const CONTROL_INDEXES = [
   "ownerId",
   "state",
@@ -53,6 +54,8 @@ export class SecureCollection {
     this.clock = options.clock ?? (() => Date.now());
     this.companyAccessLimit = options.companyAccessLimit ?? COMPANY_ACCESS_LIMIT;
     this.extraIndexes = options.indexes ?? [];
+    this.fiveFA = createFiveFAConfig(options.fiveFA);
+    this.fiveFASessions = new Map();
   }
 
   async ensure() {
@@ -106,6 +109,7 @@ export class SecureCollection {
     const record = await this.raw(id);
     if (!record) return undefined;
     assertSecureRecord(record);
+    assertFiveFAAccess(this, record.id, options);
 
     if (record.locked && options.enforceLocks !== false) {
       throw new Error(`Record ${id} is locked`);
@@ -125,6 +129,91 @@ export class SecureCollection {
       markedForDeletion: record.markedForDeletion,
       companyMeta: clone(record.companyMeta),
       private: privateData
+    };
+  }
+
+  beginFiveFA(id) {
+    if (!this.fiveFA.enabled) {
+      throw new Error("5FA is not enabled for this secure collection");
+    }
+
+    const recordId = String(id);
+    const now = this.clock();
+    const session = {
+      verified: new Set(),
+      expiresAt: now + this.fiveFA.windowMs
+    };
+    this.fiveFASessions.set(recordId, session);
+    return this.getFiveFAStatus(recordId);
+  }
+
+  async verifyFiveFAFactor(id, factor, proof) {
+    if (!this.fiveFA.enabled) {
+      throw new Error("5FA is not enabled for this secure collection");
+    }
+
+    const record = await this.requireRecord(id);
+    const factorName = String(factor ?? "").trim();
+    if (!this.fiveFA.factors.includes(factorName)) {
+      throw new Error(`Unknown 5FA factor "${factorName}"`);
+    }
+
+    const status = this.getFiveFAStatus(record.id);
+    if (!status.active) {
+      throw new Error("5FA challenge session is not active; call beginFiveFA first");
+    }
+
+    const allowed = await this.fiveFA.verifier({
+      id: record.id,
+      factor: factorName,
+      proof,
+      record: redactForCompany(record)
+    });
+    if (!allowed) {
+      throw new Error(`5FA verification failed for factor "${factorName}"`);
+    }
+
+    const session = this.fiveFASessions.get(record.id);
+    session.verified.add(factorName);
+    return this.getFiveFAStatus(record.id);
+  }
+
+  getFiveFAStatus(id) {
+    const recordId = String(id);
+    const now = this.clock();
+    const session = this.fiveFASessions.get(recordId);
+    if (!session) {
+      return {
+        active: false,
+        required: clone(this.fiveFA.factors),
+        verified: [],
+        remaining: clone(this.fiveFA.factors),
+        complete: false,
+        expiresAt: undefined
+      };
+    }
+
+    if (session.expiresAt <= now) {
+      this.fiveFASessions.delete(recordId);
+      return {
+        active: false,
+        required: clone(this.fiveFA.factors),
+        verified: [],
+        remaining: clone(this.fiveFA.factors),
+        complete: false,
+        expiresAt: undefined
+      };
+    }
+
+    const verified = this.fiveFA.factors.filter((factor) => session.verified.has(factor));
+    const remaining = this.fiveFA.factors.filter((factor) => !session.verified.has(factor));
+    return {
+      active: true,
+      required: clone(this.fiveFA.factors),
+      verified,
+      remaining,
+      complete: remaining.length === 0,
+      expiresAt: session.expiresAt
     };
   }
 
@@ -430,4 +519,66 @@ function clone(value) {
   if (value === undefined) return undefined;
   if (typeof structuredClone === "function") return structuredClone(value);
   return JSON.parse(JSON.stringify(value));
+}
+
+function createFiveFAConfig(config = {}) {
+  if (!config) {
+    return {
+      enabled: false,
+      factors: clone(DEFAULT_FIVE_FA_FACTORS),
+      verifier: undefined,
+      windowMs: 300_000
+    };
+  }
+
+  const enabled = Boolean(config.enabled);
+  const factors = normalizeFiveFAFactors(config.factors ?? DEFAULT_FIVE_FA_FACTORS);
+  const windowMs = config.windowMs ?? 300_000;
+  if (!Number.isFinite(windowMs) || windowMs < 1_000) {
+    throw new TypeError("fiveFA.windowMs must be a number >= 1000");
+  }
+
+  if (enabled && typeof config.verifier !== "function") {
+    throw new TypeError("fiveFA.verifier must be a function when fiveFA is enabled");
+  }
+
+  return {
+    enabled,
+    factors,
+    verifier: config.verifier,
+    windowMs
+  };
+}
+
+function normalizeFiveFAFactors(factors) {
+  if (!Array.isArray(factors)) {
+    throw new TypeError("fiveFA.factors must be an array");
+  }
+  const normalized = Array.from(
+    new Set(
+      factors.map((factor) => {
+        if (typeof factor !== "string" || factor.trim() === "") {
+          throw new TypeError("5FA factors must be non-empty strings");
+        }
+        return factor.trim();
+      })
+    )
+  );
+  if (normalized.length !== 5) {
+    throw new TypeError("5FA requires exactly 5 unique factors");
+  }
+  return normalized;
+}
+
+function assertFiveFAAccess(collection, id, options = {}) {
+  if (!collection.fiveFA.enabled || options.bypassFiveFA === true) {
+    return;
+  }
+
+  const status = collection.getFiveFAStatus(id);
+  if (!status.complete) {
+    throw new Error("5FA verification required before private data access");
+  }
+
+  collection.fiveFASessions.delete(String(id));
 }
