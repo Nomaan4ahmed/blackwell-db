@@ -4,8 +4,10 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
+  AIBackendHub,
   FileAdapter,
   MemoryAdapter,
+  createHTTPAIBackend,
   generateBlackwellSecret,
   openBlackwellDB,
   openSecureCollection
@@ -181,5 +183,51 @@ test("secure collection rejects private-looking company metadata", async () => {
         }
       ),
     /companyMeta cannot contain private field/
+  );
+});
+
+test("routes AI generation through registered backend with sanitized context", async () => {
+  const db = await openBlackwellDB({ adapter: new MemoryAdapter() });
+  db.registerAIBackend("echo", async ({ input, context }) => ({
+    text: `${input}:${context.intent}`
+  }));
+
+  const result = await db.aiGenerate({
+    backend: "echo",
+    input: "hello",
+    context: { intent: "test" }
+  });
+
+  assert.equal(result.backend, "echo");
+  assert.equal(result.text, "hello:test");
+});
+
+test("rejects AI context keys that look sensitive", async () => {
+  const hub = new AIBackendHub({
+    backends: {
+      local: async ({ input }) => ({ text: input })
+    }
+  });
+
+  await assert.rejects(
+    () =>
+      hub.generate({
+        backend: "local",
+        input: "hello",
+        context: {
+          token: "should-not-pass"
+        }
+      }),
+    /sensitive key/
+  );
+});
+
+test("enforces HTTPS for HTTP AI backend by default", async () => {
+  assert.throws(
+    () =>
+      createHTTPAIBackend({
+        url: "http://localhost:9999/ai"
+      }),
+    /must use https/
   );
 });

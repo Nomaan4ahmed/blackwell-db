@@ -71,6 +71,7 @@ await db.collection("notes").put({
 - Local subscriptions for reactive UI updates.
 - JSON export/import for backup or peer sync layers.
 - Optional AES-GCM secure collections for encrypted private user payloads.
+- Pluggable AI backend hub with per-backend input limits, timeout guards, and context sanitization.
 - Company/admin control views for suspend, unsuspend, lock, unlock, flag, notes, deletion hold, and restore actions without exposing private payloads.
 
 ## Commands
@@ -130,6 +131,31 @@ const privateView = await users.getPrivate("user-1");
 ```
 
 The company view advertises `companyAccessPercent: 7.5` and `companyAccessScope: "operations-only"`. It never includes `private`, `encryptedPrivate`, or plaintext private fields. The private payload can only be decrypted by code holding the encryption key.
+
+## AI Backends
+
+Blackwell DB can optionally route AI calls through a pluggable backend hub:
+
+```js
+import { AIBackendHub, openBlackwellDB } from "./src/node.js";
+
+const db = await openBlackwellDB();
+db.registerAIBackend("local-ai", async ({ input }) => ({
+  text: `local-response:${input}`
+}));
+
+const response = await db.aiGenerate({
+  backend: "local-ai",
+  input: "summarize this record"
+});
+```
+
+Security defaults for AI requests:
+
+- Input length limits to reduce prompt abuse and runaway payload size.
+- Timeout controls with cancellation support.
+- Context sanitization that rejects sensitive keys like `password`, `token`, and `secret`.
+- HTTPS-only enforcement for HTTP backends unless explicitly overridden for local development.
 
 ## Current Boundary
 

@@ -16,6 +16,7 @@
     ".": "./src/index.js",
     "./node": "./src/node.js",
     "./browser": "./src/browser.js",
+    "./ai": "./src/ai-backend.js",
     "./crypto": "./src/crypto.js",
     "./secure": "./src/secure-collection.js",
     "./adapters/memory": "./src/adapters/memory-adapter.js",

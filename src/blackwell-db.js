@@ -1,4 +1,5 @@
 import { MemoryAdapter } from "./adapters/memory-adapter.js";
+import { AIBackendHub } from "./ai-backend.js";
 
 const SNAPSHOT_VERSION = 1;
 
@@ -11,6 +12,7 @@ export async function openBlackwellDB(options = {}) {
 export class BlackwellDB {
   constructor(options = {}) {
     this.adapter = options.adapter ?? new MemoryAdapter();
+    this.ai = options.aiHub ?? new AIBackendHub({ backends: options.aiBackends });
     this.clock = options.clock ?? (() => Date.now());
     this.idFactory = options.idFactory ?? createId;
     this.collections = new Map();
@@ -262,6 +264,18 @@ export class BlackwellDB {
     await this.enqueue(async () => {
       await this.adapter.replace([snapshot]);
     });
+  }
+
+  registerAIBackend(name, backend, options = {}) {
+    return this.ai.register(name, backend, options);
+  }
+
+  unregisterAIBackend(name) {
+    return this.ai.unregister(name);
+  }
+
+  async aiGenerate(request) {
+    return this.ai.generate(request);
   }
 
   async exportJSON() {
@@ -648,6 +662,14 @@ function assertPlainObject(value, label) {
 }
 
 function createId() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  if (globalThis.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
   const random = Math.random().toString(36).slice(2, 10);
   return `${Date.now().toString(36)}-${random}`;
 }

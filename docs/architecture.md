@@ -80,3 +80,7 @@ Important boundary: encryption protects stored data from casual inspection and f
 ## Truthful Boundary
 
 Blackwell DB can make the backend unnecessary for local reads and writes. Multi-device internet sync cannot be 100 percent magic without some path for peers to find each other. That path can be a local network, removable file, WebRTC rendezvous, or a tiny relay. The database itself remains serverless; sync is an optional layer above it.
+
+## Optional AI Backend Routing
+
+Blackwell DB also includes an optional AI backend hub for apps that want model calls near local data workflows. It supports pluggable backends, per-backend request timeouts, input size limits, and sensitive-context key rejection before a request is sent. HTTP backends default to HTTPS-only endpoints.

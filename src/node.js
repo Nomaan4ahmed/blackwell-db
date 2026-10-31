@@ -1,4 +1,5 @@
 export { BlackwellCollection, BlackwellDB, openBlackwellDB } from "./blackwell-db.js";
+export { AIBackendHub, createHTTPAIBackend } from "./ai-backend.js";
 export { MemoryAdapter } from "./adapters/memory-adapter.js";
 export { FileAdapter } from "./adapters/file-adapter.js";
 export {
